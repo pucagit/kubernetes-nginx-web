@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web6
+  namespace: myapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web6 # declare that any pods with that label belong to this deployment
+  template:
+    metadata:
+      labels:
+        app: web6 # add label so other services can find it via selector
+    spec:
+      containers:
+        - name: web6
+          image: pucadock/web6:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8888
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: secret
+                  key: MYSQL_HOST
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: secret
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: secret
+                  key: DB_PASSWORD
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: secret
+                  key: DB_NAME
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web6
+  namespace: myapp
+spec:
+  selector:
+    app: web6
+  ports:
+    - protocol: TCP
+      port: 8888
+      targetPort: 8888
+      name: http

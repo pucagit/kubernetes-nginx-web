@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-web6
+  namespace: myapp
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: web6.pucavv.io.vn
+      http:
+        paths:
+          - pathType: Prefix # define path matching behavior
+            path: /
+            backend:
+              service:
+                name: web6
+                port:
+                  number: 8888
