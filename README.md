@@ -1,20 +1,4 @@
 # Kubernetes
-## What can Kubernetes do for you?
-With modern web services, users expect applications to be available 24/7, and developers expect to deploy new versions of those applications several times a day. Containerization helps package software to serve these goals, enabling applications to be released and updated without downtime. Kubernetes helps you make sure those containerized applications run where and when you want, and helps them find the resources and tools they need to work. 
-
-Kubernetes provides you with:
-- **Service discovery and load balancing** Kubernetes can expose a container using the DNS name or using their own IP address. If traffic to a container is high, Kubernetes is able to load balance and distribute the network traffic so that the deployment is stable.
-- **Storage orchestration** Kubernetes allows you to automatically mount a storage system of your choice, such as local storages, public cloud providers, and more.
-- **Automated rollouts and rollbacks** You can describe the desired state for your deployed containers using Kubernetes, and it can change the actual state to the desired state at a controlled rate. For example, you can automate Kubernetes to create new containers for your deployment, remove existing containers and adopt all their resources to the new container.
-- **Automatic bin packing** You provide Kubernetes with a cluster of nodes that it can use to run containerized tasks. You tell Kubernetes how much CPU and memory (RAM) each container needs. Kubernetes can fit containers onto your nodes to make the best use of your resources.
-- **Self-healing** Kubernetes restarts containers that fail, replaces containers, kills containers that don't respond to your user-defined health check, and doesn't advertise them to clients until they are ready to serve.
-- **Secret and configuration management** Kubernetes lets you store and manage sensitive information, such as passwords, OAuth tokens, and SSH keys. You can deploy and update secrets and application configuration without rebuilding your container images, and without exposing secrets in your stack configuration.
-- **Batch execution** In addition to services, Kubernetes can manage your batch and CI workloads, replacing containers that fail, if desired.
-- **Horizontal scaling** Scale your application up and down with a simple command, with a UI, or automatically based on CPU usage.
-- **IPv4/IPv6 dual-stack** Allocation of IPv4 and IPv6 addresses to Pods and Services
-- **Designed for extensibility** Add features to your Kubernetes cluster without changing upstream source code.
-
-
 ## Kubernetes Clusters
 Kubernetes coordinates a highly available cluster of computers that are connected to work as a single unit. 
 Kubernetes automates the distribution and scheduling of application containers across a cluster in a more efficient way.
@@ -43,8 +27,6 @@ A Kubernetes cluster consists of two types of resources:
 
 ## The Kubernetes API
 The Kubernetes API lets you query and manipulate the state of objects in Kubernetes. The core of Kubernetes' control plane is the API server and the HTTP API that it exposes. Users, the different parts of your cluster, and external components all communicate with one another through the API server.
-- **Discovery API**: provides information about the Kubernetes APIs: API names, resources, versions, and supported operations.
-- **OpenAPI v2.0 and OpenAPI v3.0**: includes all the available API paths, as well as all resources consumed and produced for every operations on every endpoints. It also includes any extensibility components that a cluster supports. The data is a complete specification and is significantly larger than that from the Discovery API.
 
 ## Communication between Nodes and the Control Plane
 **Node to Control Plane**: Kubernetes has a "hub-and-spoke" API pattern. All API usage from nodes (or the pods they run) terminates at the API server. None of the other control plane components are designed to expose remote services. The API server is configured to listen for remote connections on a secure HTTPS port (typically 443) with one or more forms of client authentication enabled. One or more forms of authorization should be enabled, especially if anonymous requests or service account tokens are allowed.
@@ -227,4 +209,166 @@ Specify `-n <namespace>` if needed:
 ```
 kubectl describe <name> --watch
 kubectl logs <name> --watch
+```
+
+## Kubernetes API Server
+**🌐 Overview**
+
+The **Kubernetes API server** exposes a REST API over HTTPS (default port **6443**).
+Everything you do with `kubectl` (create pods, get logs, etc.) is just talking to these API endpoints.
+
+You can access the API:
+
+* through `kubectl` (`kubectl get --raw /api/...`)
+* via `curl` (with a token or client cert)
+* via in-cluster HTTP requests (`https://kubernetes.default.svc`)
+* via client libraries (Go, Python, etc.)
+
+### 🔑 Connecting to the API
+
+**✅ From outside the cluster**
+
+```bash
+SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+TOKEN=$(kubectl config view --minify -o jsonpath='{.users[0].user.token}')
+CA=$(mktemp); kubectl config view --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' | base64 -d > $CA
+
+curl --cacert $CA -H "Authorization: Bearer $TOKEN" ${SERVER}/api
+```
+
+**✅ From inside a pod**
+Pods automatically get:
+* Token: `/var/run/secrets/kubernetes.io/serviceaccount/token`
+* CA cert: `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt`
+  
+Example:
+```bash
+TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+CACERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+curl --cacert $CACERT -H "Authorization: Bearer $TOKEN" https://kubernetes.default.svc/api
+```
+**📘 Common API Endpoints**
+
+The API is grouped into **core (v1)** and **named groups (apps/v1, batch/v1, etc.)**.
+
+🧱 1. Core API (`/api/v1`)
+
+| Endpoint                                  | Description                        | Example                                         |
+| ----------------------------------------- | ---------------------------------- | ----------------------------------------------- |
+| `/api/v1/namespaces`                      | List, create, or get namespaces    | `GET /api/v1/namespaces`                        |
+| `/api/v1/pods`                            | Manage Pods across all namespaces  | `GET /api/v1/pods`                              |
+| `/api/v1/namespaces/{ns}/pods`            | List or create pods in a namespace | `GET /api/v1/namespaces/default/pods`           |
+| `/api/v1/namespaces/{ns}/pods/{name}`     | Get specific pod                   | `GET /api/v1/namespaces/default/pods/nginx`     |
+| `/api/v1/namespaces/{ns}/pods/{name}/log` | Fetch pod logs                     | `GET /api/v1/namespaces/default/pods/nginx/log` |
+| `/api/v1/nodes`                           | Cluster nodes info                 | `GET /api/v1/nodes`                             |
+| `/api/v1/services`                        | Manage Services                    | `GET /api/v1/namespaces/default/services`       |
+| `/api/v1/secrets`                         | View secrets (if authorized)       | `GET /api/v1/namespaces/default/secrets`        |
+| `/api/v1/configmaps`                      | View or edit ConfigMaps            | `GET /api/v1/namespaces/default/configmaps`     |
+
+---
+
+⚙️ 2. Apps API (`/apis/apps/v1`)
+
+Used for higher-level workload controllers.
+
+| Endpoint                                    | Description                             | Example                                             |
+| ------------------------------------------- | --------------------------------------- | --------------------------------------------------- |
+| `/apis/apps/v1/deployments`                 | List all deployments                    | `GET /apis/apps/v1/deployments`                     |
+| `/apis/apps/v1/namespaces/{ns}/deployments` | List or create in namespace             | `GET /apis/apps/v1/namespaces/default/deployments`  |
+| `/apis/apps/v1/statefulsets`                | Manage StatefulSets                     | `GET /apis/apps/v1/namespaces/default/statefulsets` |
+| `/apis/apps/v1/daemonsets`                  | Manage DaemonSets                       | `GET /apis/apps/v1/namespaces/default/daemonsets`   |
+| `/apis/apps/v1/replicasets`                 | Underlying replica sets for deployments | `GET /apis/apps/v1/namespaces/default/replicasets`  |
+
+---
+
+⏱️ 3. Batch API (`/apis/batch/v1`)
+
+Used for **Jobs** and **CronJobs**.
+
+| Endpoint                  | Description     | Example                                          |
+| ------------------------- | --------------- | ------------------------------------------------ |
+| `/apis/batch/v1/jobs`     | Manage Jobs     | `GET /apis/batch/v1/namespaces/default/jobs`     |
+| `/apis/batch/v1/cronjobs` | Manage CronJobs | `GET /apis/batch/v1/namespaces/default/cronjobs` |
+
+---
+
+🛠️ 4. Autoscaling (`/apis/autoscaling/v2`)
+
+| Endpoint                                        | Description         | Example                                                                |
+| ----------------------------------------------- | ------------------- | ---------------------------------------------------------------------- |
+| `/apis/autoscaling/v2/horizontalpodautoscalers` | HPA for deployments | `GET /apis/autoscaling/v2/namespaces/default/horizontalpodautoscalers` |
+
+---
+
+🧩 5. RBAC API (`/apis/rbac.authorization.k8s.io/v1`)
+
+Controls who can do what.
+
+| Endpoint                                                 | Description           | Example                                                                  |
+| -------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------ |
+| `/apis/rbac.authorization.k8s.io/v1/roles`               | Roles in a namespace  | `GET /apis/rbac.authorization.k8s.io/v1/namespaces/default/roles`        |
+| `/apis/rbac.authorization.k8s.io/v1/clusterroles`        | Cluster-wide roles    | `GET /apis/rbac.authorization.k8s.io/v1/clusterroles`                    |
+| `/apis/rbac.authorization.k8s.io/v1/rolebindings`        | Role bindings         | `GET /apis/rbac.authorization.k8s.io/v1/namespaces/default/rolebindings` |
+| `/apis/rbac.authorization.k8s.io/v1/clusterrolebindings` | Cluster role bindings | `GET /apis/rbac.authorization.k8s.io/v1/clusterrolebindings`             |
+
+---
+
+🧠 6. API Discovery (`/api`, `/apis`)
+
+These list the available groups, versions, and resources.
+
+| Endpoint        | Description                                                          |
+| --------------- | -------------------------------------------------------------------- |
+| `/api`          | Lists the core API versions (e.g., `v1`)                             |
+| `/apis`         | Lists all named API groups (apps, batch, rbac, etc.)                 |
+| `/apis/apps`    | Lists versions within that group (e.g., v1)                          |
+| `/apis/apps/v1` | Lists all resource kinds available (deployments, statefulsets, etc.) |
+
+💡Try:
+
+```bash
+kubectl get --raw /apis | jq
+```
+
+---
+
+🧰 7. System & Metrics
+
+| Endpoint            | Description                                                | Example                     |
+| ------------------- | ---------------------------------------------------------- | --------------------------- |
+| `/metrics`          | Prometheus-format metrics from the API server (if enabled) | `GET /metrics`              |
+| `/healthz`          | Health check endpoint                                      | `GET /healthz`              |
+| `/livez`, `/readyz` | Liveness and readiness probes                              | `GET /livez`, `GET /readyz` |
+
+### 🔐 Authentication
+
+| Source         | Auth Method                          | How                                                   |
+| -------------- | ------------------------------------ | ----------------------------------------------------- |
+| From `kubectl` | kubeconfig credentials               | kubectl handles certs & tokens                        |
+| From a pod     | ServiceAccount token                 | `/var/run/secrets/kubernetes.io/serviceaccount/token` |
+| From outside   | Token or client certs                | Use `curl --cacert` + `Authorization: Bearer ...`     |
+| From app code  | `client-go`, `kubernetes` Python lib | `load_kube_config()` or `load_incluster_config()`     |
+
+## Kubernetes dashboard (is this BAC???)
+If the cluster has the kubernetes-dashboard installed via `kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
+`, we can access it from any pod in the same cluster using:
+```
+curl http://kubernetes-dashboard.kubernetes-dashboard.svc/api/v1/
+```
+Common endpoints to look for (specify `<namespace>` at the end for specific namespace):
+```
+/api/v1/secret/
+/api/v1/service/
+/api/v1/replicaset/
+/api/v1/pod/
+/api/v1/persistentvolumeclaim/
+/api/v1/node/
+/api/v1/namespace/
+```
+**Example reading the secrets (beside GET request, we can use other methods to communicate with the K8s API server to create, update, delete other components):**
+```
+# Gain access into any pod
+kubectl exec -it <pod_name> -n <name_space> -- /bin/sh
+# Inside the pod
+curl http://kubernetes-dashboard.kubernetes-dashboard.svc/api/v1/secret
 ```
