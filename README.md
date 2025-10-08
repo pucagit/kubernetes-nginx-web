@@ -63,11 +63,14 @@ The Kubernetes API lets you query and manipulate the state of objects in Kuberne
 
 **Service**
 - Service is a method for exposing a network application that is running as one or more Pods in your cluster.
-- Each Pod gets its own IP address and they could change. Service serves as a load balancer for these groups of Pods.
+- Each Pod gets its own IP address and they could change. Service serves as a load balancer for these groups of Pods with its own stable IP.
 - Service types:
-    - `ClusterIP`: Exposes the Service on a cluster-internal IP. Choosing this value makes the Service only reachable from within the cluster. This is the default that is used if you don't explicitly specify a type for a Service.
+    - `ClusterIP` (default): Exposes the Service on a cluster-internal IP. Choosing this value makes the Service only reachable from within the cluster. This is the default that is used if you don't explicitly specify a type for a Service.
+  ![alt text](clusterip.png)
     - `NodePort`: Exposes the Service on each Node's IP at a static port (the NodePort). To make the node port available, Kubernetes sets up a cluster IP address, the same as if you had requested a Service of type: `ClusterIP`.
-    - `LoadBalancer`: Exposes the Service externally using an external load balancer. Kubernetes does not directly offer a load balancing component; you must provide one, or you can integrate your Kubernetes cluster with a cloud provider.
+  ![alt text](nodeport.png)
+    - `LoadBalancer`: Open a node port only accessible through the Load Balancer.
+  ![alt text](loadbalancer.png)
     - `ExternalName`: Maps the Service to the contents of the `externalName` field (for example, to the hostname api.foo.bar.example). The mapping configures your cluster's DNS server to return a CNAME record with that external hostname value. No proxying of any kind is set up.
   
 **Ingress**
@@ -217,4 +220,11 @@ kubectl exec -it <pod_name> -- sh
 **Copy file from host into pod:**
 ```
 kubectl cp path/to/file <pod_name>:path/to/file/to/copy
+```
+
+## Debug
+Specify `-n <namespace>` if needed:
+```
+kubectl describe <name> --watch
+kubectl logs <name> --watch
 ```

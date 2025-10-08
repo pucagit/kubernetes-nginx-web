@@ -11,6 +11,6 @@ spec:
         paths:
           - pathType: Prefix # define path matching behavior
             path: /
-            backend:
+            backend: # access the service via its name (like DNS) and port
               serviceName: web6
               servicePort: 8888
